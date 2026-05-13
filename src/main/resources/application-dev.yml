@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: leitao-angola
+
+  datasource:
+    url: jdbc:postgresql://localhost:5433/lelo_angola
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+    endpoint:
+      health:
+        show-details: always
+
+jwt:
+  secret: "leloAngolaSecretKey1234567890ForDevelopmentOnly"
+  expiration: 86400000          # 24 horas
+  refresh-expiration: 604800000 # 7 dias
