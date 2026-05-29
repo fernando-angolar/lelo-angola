@@ -1,0 +1,16 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  flyway:
+    enabled: false
+
+jwt:
+  secret: "leloAngolaTestSecretKey1234567890ForTestingOnlyNotProduction"
+  expiration: 86400000
+  refresh-expiration: 604800000
