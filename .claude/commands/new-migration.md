@@ -27,6 +27,9 @@ Migrations já definidas no plano do projecto (CLAUDE.md):
 | V5 | notifications |
 | V6 | outbox_events |
 | V7 | seed admin user |
+| V8 | deposits (caução) |
+| V9 | payments |
+| V10 | invoices (AGT/SAF-T) |
 
 Se a migration se encaixa numa das previstas, usar esse número. Se é algo novo, usar o próximo disponível.
 
@@ -34,12 +37,15 @@ Se a migration se encaixa numa das previstas, usar esse número. Se é algo novo
 
 ## Passo 2 — Ler o spec correspondente
 
-Antes de escrever o SQL, ler o schema exacto do spec relevante em `docs/specs/`:
-- Leilões → `03-auction-management.md`
-- Lances → `04-bidding-system.md`
-- Auditoria → `06-audit-history.md`
+Antes de escrever o SQL, ler o schema exacto na secção relevante do `SPEC.md` (subsecção "Modelo de dados" de cada módulo, e o resumo na secção 13):
+- Leilões → secção 6
+- Lances → secção 7
+- Caução → secção 8
+- Pagamento → secção 9
+- Facturação → secção 10
+- Auditoria → secção 12
 
-O schema SQL do spec é a fonte de verdade. Não inventar colunas.
+O schema SQL do SPEC.md é a fonte de verdade. Não inventar colunas.
 
 ---
 

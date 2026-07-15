@@ -40,3 +40,8 @@ jwt:
   secret: "leloAngolaSecretKey1234567890ForDevelopmentOnly"
   expiration: 86400000
   refresh-expiration: 604800000
+
+# Origens permitidas para CORS e handshake WebSocket (dev: lelo-web Vite + lelo-mobile Expo).
+# Restringir ao domínio real do frontend em produção (SPEC §5.6).
+cors:
+  allowed-origins: http://localhost:5173,http://localhost:4173,http://localhost:19006,http://localhost:8081

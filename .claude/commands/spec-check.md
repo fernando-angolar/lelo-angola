@@ -7,19 +7,30 @@ argument-hint: Nome do módulo a verificar (ex: auth, auction, bidding)
 
 Vais auditar o módulo **$ARGUMENTS** e verificar a sua conformidade com o spec e as regras do CLAUDE.md.
 
-## Passo 1 — Ler o spec do módulo
+## Passo 1 — Ler o SPEC (fonte única de verdade)
 
-Localizar e ler o spec correspondente em `docs/specs/`:
+**1a. Ler as secções globais** de `SPEC.md` (na raiz do projecto). Extrair:
+- As **Regras de Negócio Globais** (secção 3, R-01 a R-17) — invariantes que valem para todo o sistema
+- Os **Requisitos Não-Funcionais** (secção 4, NFR-01 a NFR-10)
+- As **Convenções de Código** (secção 14): UUID, `Instant`, `@Version`, naming snake_case, migrations Flyway, `ApiResponse<T>`, sem Lombok
+- O **Modelo de Dados Consolidado** (secção 13) — para confirmar que as tabelas do módulo batem certo
 
-| Módulo | Spec |
-|--------|------|
-| auth | `02-security-auth.md` |
-| auction | `03-auction-management.md` |
-| bidding | `04-bidding-system.md` |
-| realtime | `05-realtime.md` |
-| audit | `06-audit-history.md` |
+Se o `SPEC.md` não existir na raiz, reportar como problema **blocker** (o Spec-Driven perdeu a sua âncora).
 
-Se o módulo não tiver spec, reportar isso como problema crítico.
+**1b. Ler a secção do módulo** dentro do mesmo `SPEC.md`:
+
+| Módulo | Secção do SPEC.md |
+|--------|-------------------|
+| auth | 5 — Segurança & Autenticação |
+| auction | 6 — Gestão de Leilões |
+| bidding | 7 — Sistema de Lances |
+| deposit | 8 — Caução / Depósitos |
+| payment | 9 — Pagamento & Segunda Oferta |
+| invoice | 10 — Facturação (AGT / SAF-T) |
+| realtime / notification | 11 — Tempo Real & Notificações |
+| audit | 12 — Auditoria & Histórico |
+
+Se o módulo não tiver secção no SPEC.md, reportar isso como problema crítico.
 
 ---
 
@@ -68,24 +79,38 @@ Para cada método do Controller verificar:
 
 ---
 
-## Passo 4 — Verificar regras de negócio (módulo bidding)
+## Passo 4 — Verificar as regras de negócio (R-01 a R-17)
 
-Se o módulo for `bidding`, verificar explicitamente cada regra:
+As regras R-01 a R-17 do `SPEC.md` são **invariantes globais**. Não vivem só no `bidding` — cada uma é imposta por uma camada concreta. Verificar **as regras relevantes ao módulo em análise**, usando o mapa abaixo. Se o módulo não for responsável por uma regra, marcá-la como `N/A` (não como conforme).
 
-- [ ] **R-01** — Lances só aceites com `status = ACTIVE` ou `EXTENDED`
-- [ ] **R-02** — `amount > currentHighestBid + minIncrement`
-- [ ] **R-03** — `timestamp` do lance definido pelo servidor (não pelo cliente)
-- [ ] **R-04** — Zero UPDATE ou DELETE em `bids` (append-only)
-- [ ] **R-05** — Vencedor = maior lance válido no fim
-- [ ] **R-06** — `reservePrice` verificado antes de marcar como "vendido"
-- [ ] **R-07** — Anti-sniping implementado: lance nos últimos N min estende timer
-- [ ] **R-08** — `UNIQUE INDEX (auction_id, amount)` existe e `DataIntegrityViolationException` é tratado como `DuplicateBidException`
+| Regra | Camada que a impõe | Módulo(s) | O que verificar |
+|-------|--------------------|-----------|-----------------|
+| **R-01** | `Auction.isAcceptingBids()` + validação no `BidServiceImpl` | auction, bidding | Lances só aceites com `status = ACTIVE` ou `EXTENDED` |
+| **R-02** | Validação no `BidServiceImpl` | bidding | `amount > currentHighestBid + minIncrement` |
+| **R-03** | `BidServiceImpl` define `Instant.now()` | bidding | `timestamp` do lance vem do servidor, nunca do payload do cliente |
+| **R-04** | Entidade `Bid` + migration `bids` | bidding | `Bid` sem setters de negócio, sem `@PreUpdate/@PreRemove`; zero UPDATE/DELETE em `bids` |
+| **R-05** | Determinação de vencedor no fim (scheduler/service) | auction, bidding | Vencedor = maior lance válido no momento do fim |
+| **R-06** | Lógica de fecho do leilão | auction | Só marca "vendido" se `highestBid >= reservePrice` (quando definido) |
+| **R-07** | `Auction.isInAntiSnipingWindow()` + `applyExtension()` | auction, bidding | Lance nos últimos N min estende `endTime` em N min |
+| **R-08** | Migration `bids` + tratamento de excepção | bidding | `UNIQUE INDEX (auction_id, amount)` existe e `DataIntegrityViolationException` → `DuplicateBidException` |
+| **R-09** | `Auction.canExtend()` + `applyExtension()` | auction, bidding | Anti-sniping pára de estender após `maxExtensions` (padrão 3) |
+| **R-10** | Validação no `BidServiceImpl` | bidding | Vendedor não licita no próprio leilão → `SelfBiddingException` |
+| **R-11** | `DepositService.hasHeldDeposit()` no `validateBid` | deposit, bidding | Só licita quem tem caução `HELD` |
+| **R-12** | Fecho do leilão / consumer `auction-finished` | deposit, auction | Cauções dos não-vencedores → `RELEASED` |
+| **R-13** | `AuctionScheduler.handlePaymentDeadlines()` | deposit, payment | Vencedor sem pagar em 48h → caução `CAPTURED` + segunda oferta |
+| **R-14** | `UNIQUE (idempotency_key)` + `PaymentServiceImpl` | payment | Retry/webhook não gera cobrança duplicada |
+| **R-15** | Migrations + entidades | todos | Dinheiro em `NUMERIC(18,2)`/`BigDecimal`, nunca float |
+| **R-16** | `PaymentServiceImpl.chargeWinner()` | payment, auth | BI e NIF exigidos antes de pagar/facturar |
+| **R-17** | `InvoiceServiceImpl` | invoice | Factura com `agt_reference` único (AGT/SAF-T) |
 
-Para bidding verificar também:
-- [ ] Redisson `RLock` usado antes de qualquer validação
+Para cada regra relevante, apontar **o ficheiro e a linha** onde é imposta. Se uma regra relevante não tiver ponto de imposição no código, é um **blocker**.
+
+### Verificações extra específicas do `bidding`
+- [ ] Redisson `RLock` (`lock:auction:{id}`) obtido **antes** de qualquer validação
 - [ ] Lock com timeout de 10s
-- [ ] `SELECT ... FOR UPDATE` dentro da transacção
-- [ ] Evento publicado no Kafka após commit
+- [ ] `SELECT ... FOR UPDATE` (pessimistic lock) dentro da transacção
+- [ ] Lock libertado no `finally` (mesmo em caso de excepção)
+- [ ] Evento publicado no Kafka / Outbox após o commit
 
 ---
 
@@ -126,5 +151,9 @@ Ordenar por severidade: blocker > major > minor.
 
 Para cada problema reportar:
 - Ficheiro e linha
-- Regra violada
+- Regra violada (referir a regra do `SPEC.md` — ex: R-03, convenção "Timestamps `Instant`" — ou a secção do spec do módulo)
 - Correcção sugerida
+
+Terminar com um veredicto explícito:
+- **Conforme ao SPEC** — módulo respeita as secções globais, a secção do módulo e todas as regras R-01 a R-17 relevantes
+- **Não conforme** — listar os blockers que impedem o fecho da fase correspondente no `docs/PLANO_DE_DESENVOLVIMENTO.md`

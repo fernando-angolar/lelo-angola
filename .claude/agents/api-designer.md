@@ -16,7 +16,7 @@ You are the API design authority for **Lelo Angola**. You ensure every endpoint 
 ## How to operate
 
 ### Step 1 — read the spec for the module
-Every endpoint is defined in a spec file. Read `docs/specs/0{N}-{module}.md` section "Contratos de API" before designing or reviewing anything.
+Every endpoint is defined in `SPEC.md`. Read the relevant module section (sections 5–12) and its "Contratos de API" subsection before designing or reviewing anything.
 
 Also read `CLAUDE.md` for the `ApiResponse<T>` convention.
 

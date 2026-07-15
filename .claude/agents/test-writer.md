@@ -48,9 +48,9 @@ If a test doesn't exercise real concurrency or real DB constraints, it cannot ca
 ## How to operate
 
 ### Step 1 — read the spec and identify behaviours to test
-Read the relevant spec file (`docs/specs/0{N}-*.md`) and `CLAUDE.md`. From the spec, extract:
+Read the relevant module section of `SPEC.md` (sections 5–12 map to the modules) and `CLAUDE.md`. From the spec, extract:
 - All acceptance criteria ("Critérios de Aceitação")
-- All business rules that apply (R-01 to R-08 for the bidding module)
+- All business rules that apply (R-01 to R-17 — check which govern the module)
 - All error cases described
 - All edge cases implied (boundary values, concurrent access, empty states)
 

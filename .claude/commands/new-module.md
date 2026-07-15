@@ -11,7 +11,7 @@ Vais criar o módulo **$ARGUMENTS** de raiz, respeitando todas as regras do CLAU
 
 
 A ordem é **sempre** esta:
-1. ANALISAR → ler o spec correspondente em `docs/specs/`
+1. ANALISAR → ler a secção correspondente do `SPEC.md` (secções 5–12 mapeiam os módulos)
 2. ESCREVER TESTES → criar testes (RED)
 3. IMPLEMENTAR → código mínimo para os testes passarem (GREEN)
 4. REFACTORING → limpar sem quebrar testes
@@ -22,10 +22,10 @@ A ordem é **sempre** esta:
 
 ## Fase 1 — Ler o spec
 
-1. Verificar se existe `docs/specs/` com spec do módulo
+1. Abrir `SPEC.md` (fonte única de verdade) e localizar a secção do módulo **$ARGUMENTS**
 2. Identificar:
    - Entidades e campos
-   - Regras de negócio aplicáveis (R-01 a R-08 para bidding)
+   - Regras de negócio aplicáveis (R-01 a R-17 — ver quais afectam o módulo)
    - Endpoints da API (método, path, request, response, status codes)
    - Schema SQL da tabela
    - Eventos Kafka (se aplicável)

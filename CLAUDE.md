@@ -47,45 +47,57 @@ curl http://localhost:8080/health
 
 ## Estrutura de ficheiros actual
 
+A estrutura já está migrada para o layout modular (`modules/` + `shared/`).
+
 ```
 src/main/java/ao/com/angotech/
 ├── LeitaoAngolaApplication.java
-├── config/
-│   └── SecurityConfig.java            ← JWT filter chain configurado
-├── controller/
-│   ├── AuthController.java            ← /auth/register, /auth/login, /auth/refresh
-│   └── HealthController.java
-├── dto/
-│   ├── AuthResponse.java
-│   ├── LoginRequest.java
-│   ├── RegisterRequest.java
-│   └── UserResponse.java
-├── entity/
-│   └── User.java                      ← implementa UserDetails, roles como List<String>
-├── repository/
-│   └── UserRepository.java
-├── security/
-│   ├── CustomUserDetailsService.java
-│   ├── JwtFilter.java
-│   └── JwtService.java                ← gera e valida JWT + RefreshToken
-└── service/
-    ├── AuthService.java               ← interface
-    └── impl/AuthServiceImpl.java      ← register, login, refreshToken implementados
+├── modules/
+│   ├── auth/                          ← MÓDULO COMPLETO (Fase 1)
+│   │   ├── config/
+│   │   │   └── SecurityConfig.java    ← JWT filter chain configurado
+│   │   ├── controller/
+│   │   │   ├── AuthController.java    ← /auth/register, /login, /refresh, /logout, /me, change-password
+│   │   │   └── AdminController.java   ← gestão de utilizadores (admin)
+│   │   ├── domain/
+│   │   │   └── User.java              ← implementa UserDetails, roles como List<String>
+│   │   ├── dto/                       ← Auth/Login/Register/Refresh/Logout/ChangePassword/UserResponse
+│   │   ├── exception/                 ← 6 exceptions de domínio (InvalidCredentials, EmailAlreadyExists,
+│   │   │                                 InvalidToken, DisabledUser, WrongPassword, UserNotFound)
+│   │   ├── repository/
+│   │   │   └── UserRepository.java
+│   │   ├── security/
+│   │   │   ├── CustomUserDetailsService.java
+│   │   │   ├── JwtFilter.java
+│   │   │   └── JwtService.java        ← gera e valida JWT + RefreshToken
+│   │   └── service/
+│   │       ├── AuthService.java       ← interface
+│   │       └── impl/AuthServiceImpl.java
+│   └── realtime/                      ← Fase 4 iniciada (só infra WebSocket)
+│       ├── config/WebSocketConfig.java
+│       └── security/StompAuthChannelInterceptor.java  ← autenticação STOMP
+└── shared/
+    ├── config/CorsConfig.java
+    ├── controller/HealthController.java
+    ├── exception/
+    │   ├── BusinessException.java
+    │   └── GlobalExceptionHandler.java
+    └── response/ApiResponse.java
 
 src/main/resources/
 ├── application.yaml                   ← config principal (PostgreSQL, JWT, Flyway)
-└── application-dev.yml                ← overrides de dev
+├── application-dev.yml                ← overrides de dev (ddl-auto: validate)
+└── db/migration/                      ← V1 (users), V7 (seed admin)
+
+SPEC.md                                ← ESPECIFICAÇÃO TÉCNICA ÚNICA (fonte de verdade — raiz)
+                                          Contém tudo: arquitectura, regras globais (R-01…R-17,
+                                          NFR-01…NFR-10), e os módulos auth, leilões, lances,
+                                          caução, pagamento, factura AGT, tempo real, auditoria,
+                                          modelo de dados, convenções e plano de fases.
 
 docs/
-├── SPEC.md                            ← índice do Spec Driven e regras globais
-└── specs/
-    ├── 01-architecture.md             ← estrutura de pacotes, fluxos, stack
-    ├── 02-security-auth.md            ← auth completo: o que falta, contratos de API
-    ├── 03-auction-management.md       ← leilões: estados, schema, scheduler
-    ├── 04-bidding-system.md           ← CORE CRÍTICO: lances com lock distribuído
-    ├── 05-realtime.md                 ← WebSocket/STOMP, Kafka→Redis→broadcast
-    ├── 06-audit-history.md            ← event store imutável, tipos de eventos
-    └── 07-implementation-plan.md      ← 6 fases com critérios de saída
+├── PLANO_DE_DESENVOLVIMENTO.md        ← plano operacional (como e quando)
+└── postman-fase1.md                   ← colecção Postman da Fase 1
 ```
 
 ---
@@ -94,13 +106,14 @@ docs/
 
 | Módulo | Estado |
 |--------|--------|
-| Autenticação (base) | Parcialmente implementado — falta refresh seguro, logout com blacklist Redis, endpoints de admin |
-| Gestão de Leilões | Não iniciado |
-| Sistema de Lances | Não iniciado |
-| Tempo Real (WebSocket) | Não iniciado |
-| Auditoria | Não iniciado |
+| Autenticação (Fase 1) | ✅ Completo — register, login, refresh, logout, /me (GET/PUT/DELETE), change-password, admin de utilizadores. Testado (unidade + integração + E2E) |
+| Fundação transversal (`shared/`) | ✅ `GlobalExceptionHandler`, `ApiResponse<T>`, `BusinessException`, `CorsConfig`, `HealthController` |
+| Gestão de Leilões (Fase 2) | ⬜ Não iniciado |
+| Sistema de Lances (Fase 3, core) | ⬜ Não iniciado |
+| Tempo Real / WebSocket (Fase 4) | 🟡 Infra iniciada — `WebSocketConfig` + `StompAuthChannelInterceptor`. Falta `BidController`, consumers, broadcast |
+| Auditoria | ⬜ Não iniciado |
 
-**Próximo passo:** Fase 1 do `docs/specs/07-implementation-plan.md` — reorganizar pacotes e completar autenticação.
+**Próximo passo:** Fase 2 (secção 15 do `SPEC.md`) — Gestão de Leilões: `V2`, entidades `Auction`/`AuctionItem` com domínio, `AuctionRepository` (pessimistic lock), CRUD (§6.4), `AuctionScheduler` (ShedLock) e `V4`/auditoria básica. Sempre em Test-First.
 
 ---
 
@@ -244,7 +257,7 @@ Exemplos:
 
 ## Regras de negócio imutáveis (nunca violar)
 
-Estas regras são definidas em `docs/SPEC.md` e **não podem ser alteradas sem revisão de produto**:
+Estas regras são definidas em `SPEC.md` e **não podem ser alteradas sem revisão de produto**:
 
 - **R-01** — Só aceitar lances quando `status = ACTIVE` ou `EXTENDED`
 - **R-02** — `Bid.amount > currentHighestBid + minIncrement`
@@ -432,23 +445,25 @@ Este fluxo deve ser respeitado em qualquer implementação do módulo de lances:
 3. Kafka Consumer → actualizar read model + broadcast WebSocket
 ```
 
-Ver detalhe completo em `docs/specs/04-bidding-system.md`.
+Ver detalhe completo na secção 7 do `SPEC.md`.
 
 ---
 
 ## Migrations Flyway
 
-Ficheiros em `src/main/resources/db/migration/`:
+Ficheiros em `src/main/resources/db/migration/`. Estado actual: **só V1 e V7 existem** (as restantes serão criadas nas Fases 2–5). Nota: a numeração no SPEC §15 usa V8 (deposits), V9 (payments), V10 (invoices) — seguir o SPEC como fonte de verdade.
 
-| Versão | Ficheiro | Conteúdo |
-|--------|---------|---------|
-| V1 | `V1__create_users_table.sql` | users, user_roles |
-| V2 | `V2__create_auctions_tables.sql` | auction_items, auction_item_photos, auctions |
-| V3 | `V3__create_bids_table.sql` | bids (append-only, UNIQUE INDEX) |
-| V4 | `V4__create_audit_tables.sql` | auction_events, admin_audit_log |
-| V5 | `V5__create_notifications_table.sql` | notifications |
-| V6 | `V6__create_outbox_table.sql` | outbox_events |
-| V7 | `V7__seed_admin_user.sql` | Utilizador admin inicial |
+| Versão | Ficheiro | Conteúdo | Estado |
+|--------|---------|---------|--------|
+| V1 | `V1__create_users_table.sql` | users, user_roles | ✅ Existe |
+| V7 | `V7__seed_admin_user.sql` | Utilizador admin inicial | ✅ Existe |
+| V2 | `V2__create_auctions_tables.sql` | auction_items, auction_item_photos, auctions | ⬜ Fase 2 |
+| V4 | `V4__create_audit_tables.sql` | auction_events, admin_audit_log | ⬜ Fase 2 |
+| V3 | `V3__create_bids_table.sql` | bids (append-only, UNIQUE INDEX) | ⬜ Fase 3 |
+| V8 | `V8__create_deposits_table.sql` | deposits (caução) | ⬜ Fase 3 |
+| V5 | `V5__create_notifications_table.sql` | notifications | ⬜ Fase 4 |
+| V9 / V10 | payments / invoices | pagamento, facturação AGT | ⬜ Fase 5 |
+| V6 | `V6__create_outbox_table.sql` | outbox_events | ⬜ Fase 5 |
 
 O schema SQL exacto de cada tabela está no spec do módulo correspondente.
 
@@ -469,15 +484,13 @@ Este projecto tem agentes especializados em `.claude/agents/`:
 
 ---
 
-## Dependências ainda não adicionadas ao pom.xml
+## Dependências no pom.xml
 
-Necessárias para as Fases 3-4:
+**Já presentes:** web, security, **websocket**, data-jpa, validation, actuator, data-redis, flyway (core + postgresql), jjwt 0.11.5 (api/impl/jackson), postgresql, spring-boot-starter-test, **spring-boot-testcontainers** + testcontainers (postgresql, kafka).
+
+**Ainda por adicionar** (Fase 3 — core crítico):
 
 ```xml
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-websocket</artifactId>
-</dependency>
 <dependency>
     <groupId>org.redisson</groupId>
     <artifactId>redisson-spring-boot-starter</artifactId>
@@ -485,25 +498,17 @@ Necessárias para as Fases 3-4:
 </dependency>
 <dependency>
     <groupId>org.springframework.kafka</groupId>
-    <artifactId>spring-kafka</artifactId>
-</dependency>
-<dependency>
-    <groupId>org.projectlombok</groupId>
-    <artifactId>lombok</artifactId>
-    <optional>true</optional>
-</dependency>
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-testcontainers</artifactId>
-    <scope>test</scope>
+    <artifactId>spring-kafka</artifactId>       <!-- só o Testcontainers do Kafka está presente -->
 </dependency>
 ```
+
+> **Sem Lombok** — o SPEC (§15, Fase 1) exclui explicitamente o Lombok. Não adicionar.
 
 ---
 
 ## Alertas importantes
 
-- `application.yaml` tem `ddl-auto: create` — **mudar para `validate`** ao criar a primeira migration V1
-- O `jwt.secret` actual é fraco — em produção usar variável de ambiente com mínimo 256 bits
-- O `AuthServiceImpl` lança `RuntimeException` genérico — substituir por exceptions de domínio em cada refatoração
-- A tabela `bids` tem um `UNIQUE INDEX (auction_id, amount)` — `DataIntegrityViolationException` deve ser tratado e traduzido para `DuplicateBidException`
+- `application-dev.yml` já usa `ddl-auto: validate` (correcto) — **nunca** repor `create`/`update` fora de test; o schema é gerido por Flyway
+- O `jwt.secret` de dev (`application-dev.yml`) é fraco e está marcado como dev-only — em produção usar variável de ambiente com mínimo 256 bits
+- O módulo auth já tem exceptions de domínio próprias (`modules/auth/exception/`) tratadas pelo `GlobalExceptionHandler` — seguir o mesmo padrão nos novos módulos, nunca `RuntimeException` genérico
+- A tabela `bids` (Fase 3) terá `UNIQUE INDEX (auction_id, amount)` — `DataIntegrityViolationException` deve ser tratado e traduzido para `DuplicateBidException`

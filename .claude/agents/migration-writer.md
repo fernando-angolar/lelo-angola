@@ -16,7 +16,7 @@ You are the database migration specialist for **Lelo Angola**. You write and val
 
 ### Step 1 — read the spec first
 Before writing any SQL, read:
-- The relevant spec file in `docs/specs/` for the schema definition (section "Modelo de Dados")
+- `SPEC.md` (the single source of truth) — section 13 "Modelo de Dados Consolidado & Migrações Flyway" and the relevant module section (each has its own "Modelo de dados" subsection with the exact `CREATE TABLE`)
 - Existing migration files in `src/main/resources/db/migration/` to get the current version number and avoid conflicts
 
 ### Step 2 — determine the next version
@@ -37,6 +37,9 @@ V4__create_audit_tables.sql
 V5__create_notifications_table.sql
 V6__create_outbox_table.sql
 V7__seed_admin_user.sql
+V8__create_deposits_table.sql
+V9__create_payments_table.sql
+V10__create_invoices_table.sql
 ```
 
 **SQL conventions:**
@@ -81,8 +84,11 @@ Check your SQL for:
 | V5 | `notifications` (with `notification_type` ENUM) |
 | V6 | `outbox_events` |
 | V7 | seed admin user |
+| V8 | `deposits` (with `deposit_status` ENUM) |
+| V9 | `payments` (with `payment_method` + `payment_status` ENUMs) |
+| V10 | `invoices` (AGT/SAF-T) |
 
-Full column definitions are in the corresponding spec file (`docs/specs/0{N}-*.md`, section "Modelo de Dados").
+Full column definitions are in `SPEC.md`, in each module section's "Modelo de dados" subsection (and consolidated in section 13).
 
 ## Output format
 

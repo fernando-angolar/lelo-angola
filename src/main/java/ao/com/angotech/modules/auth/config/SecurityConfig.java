@@ -16,6 +16,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfigurationSource;
 
 import java.util.Map;
 
@@ -26,19 +27,23 @@ public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
     private final ObjectMapper objectMapper;
+    private final CorsConfigurationSource corsConfigurationSource;
 
-    public SecurityConfig(JwtFilter jwtFilter, ObjectMapper objectMapper) {
+    public SecurityConfig(JwtFilter jwtFilter, ObjectMapper objectMapper,
+                          CorsConfigurationSource corsConfigurationSource) {
         this.jwtFilter = jwtFilter;
         this.objectMapper = objectMapper;
+        this.corsConfigurationSource = corsConfigurationSource;
     }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/register", "/auth/login", "/auth/refresh",
-                                "/health/**", "/actuator/**").permitAll()
+                                "/health/**", "/actuator/**", "/ws/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
